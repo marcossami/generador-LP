@@ -25,7 +25,7 @@ def cargar_consumos(raw_bytes, filename):
             return pd.read_html(raw_bytes, header=0)[0]
         except:
             pass
-    raise RuntimeError("Error leyendo consumos; conviértelo a .xlsx o .csv.")
+    raise RuntimeError("Error leyendo consumos; convíertelo a .xlsx o .csv.")
 
 # ─── Sidebar Inputs ────────────────────────────────────────────────────────────
 reporte_file     = st.sidebar.file_uploader("Reporte consumos (.xls/.xlsx/.csv)",   type=["xls","xlsx","csv"])
@@ -48,22 +48,26 @@ periodo_liq = f"{prev_m:02d}/{prev_y}"
 
 # ─── Workflow ─────────────────────────────────────────────────────────────────
 if reporte_file and proveedores_file and plantilla_file:
-    # 1) Leer consumos y extraer Subtotal (celda I11)
+    # 1) Leer consumos y extraer Subtotal (celda I11) y marca (celda B7)
     raw_cons = reporte_file.read()
     try:
         df_cons   = cargar_consumos(raw_cons, reporte_file.name)
         ext_cons  = Path(reporte_file.name).suffix.lower()
         if ext_cons == ".xls":
             wb_xls   = xlrd.open_workbook(file_contents=raw_cons)
-            subtotal = float(wb_xls.sheet_by_index(0).cell_value(10, 8))
+            sheet    = wb_xls.sheet_by_index(0)
+            subtotal = float(sheet.cell_value(10, 8))
+            marca    = str(sheet.cell_value(6, 1)).strip()
         else:
             wb_xlsx  = load_workbook(filename=BytesIO(raw_cons), data_only=True)
-            subtotal = float(wb_xlsx.active["I11"].value)
+            ws       = wb_xlsx.active
+            subtotal = float(ws["I11"].value)
+            marca    = str(ws["B7"].value).strip()
     except Exception as e:
         st.error(f"Error leyendo consumos: {e}")
         st.stop()
 
-    # 2) Leer proveedores
+    # 2) Leer proveedores y preparar buscador
     raw_prov = proveedores_file.read()
     try:
         df_prov = cargar_consumos(raw_prov, proveedores_file.name)
@@ -71,18 +75,25 @@ if reporte_file and proveedores_file and plantilla_file:
         st.error(f"Error leyendo proveedores: {e}")
         st.stop()
 
-    # 3) Mostrar previews
-    st.subheader("Vista previa: consumos")
-    st.dataframe(df_cons.head())
-    st.subheader("Vista previa: proveedores")
-    st.dataframe(df_prov.head())
+    # Limpiamos razón social y marcas
+    df_prov["ProvClean"]   = df_prov["Proveedores"].str.replace(r"\s*\(.*\)", "", regex=True).str.strip()
+    df_prov["MarcaClean"]  = df_prov["marcas"].astype(str).str.strip()
 
-    # 4) Selección de proveedor
-    df_prov["ProvClean"] = df_prov["Proveedores"].str.replace(r"\s*\(.*\)", "", regex=True).str.strip()
-    seleccionado = st.sidebar.selectbox("Seleccione proveedor", df_prov["ProvClean"])
-    prov = df_prov[df_prov["ProvClean"] == seleccionado].iloc[0]
+    # 3) Buscar proveedor por marca en B7
+    matches = df_prov[df_prov["MarcaClean"].str.lower() == marca.lower()]
+    if matches.empty:
+        st.error(f"No se encontró proveedor para la marca: '{marca}'")
+        st.stop()
+    prov = matches.iloc[0]
 
-    # 5) Generar LP
+    # Mostrar marca y proveedor detectado
+    st.write(f"🔍 Marca detectada en reporte: **{marca}**")
+    st.write("Proveedor seleccionado automáticamente:")
+    st.write(f"- Razón social: {prov['ProvClean']}")
+    st.write(f"- Dirección:    {prov['Dirección']}")
+    st.write(f"- CUIT:         {prov['CUIT']}")
+
+    # 4) Generar LP
     if st.button("Generar LP"):
         try:
             tpl = PdfReader(BytesIO(plantilla_file.read()))
