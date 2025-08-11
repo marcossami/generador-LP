@@ -27,6 +27,10 @@ def cargar_consumos(raw_bytes, filename):
             pass
     raise RuntimeError("Error leyendo consumos; convíertelo a .xlsx o .csv.")
 
+# --- helper de formato AR: miles con punto y decimales con coma ---
+def fmt_money(v):
+    return f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 # ─── Sidebar Inputs ────────────────────────────────────────────────────────────
 reporte_file     = st.sidebar.file_uploader("Reporte consumos (.xls/.xlsx/.csv)",   type=["xls","xlsx","csv"])
 proveedores_file = st.sidebar.file_uploader("Listado proveedores (.xls/.xlsx/.csv)", type=["xls","xlsx","csv"])
@@ -48,7 +52,7 @@ periodo_liq = f"{prev_m:02d}/{prev_y}"
 
 # ─── Workflow ─────────────────────────────────────────────────────────────────
 if reporte_file and proveedores_file and plantilla_file:
-    # 1) Leer consumos y extraer Subtotal (celda I11) y marca (celda B7)
+    # 1) Leer consumos y extraer Subtotal (celda I11), marca (B7) y B8 para KANSAS
     raw_cons = reporte_file.read()
     try:
         df_cons   = cargar_consumos(raw_cons, reporte_file.name)
@@ -56,13 +60,21 @@ if reporte_file and proveedores_file and plantilla_file:
         if ext_cons == ".xls":
             wb_xls   = xlrd.open_workbook(file_contents=raw_cons)
             sheet    = wb_xls.sheet_by_index(0)
-            subtotal = float(sheet.cell_value(10, 8))
-            marca    = str(sheet.cell_value(6, 1)).strip()
+            subtotal = float(sheet.cell_value(10, 8))  # I11
+            marca    = str(sheet.cell_value(6, 1)).strip()  # B7
+            try:
+                b8_text = str(sheet.cell_value(7, 1)).strip()  # B8
+            except:
+                b8_text = ""
         else:
             wb_xlsx  = load_workbook(filename=BytesIO(raw_cons), data_only=True)
             ws       = wb_xlsx.active
             subtotal = float(ws["I11"].value)
             marca    = str(ws["B7"].value).strip()
+            try:
+                b8_text = str(ws["B8"].value).strip() if ws["B8"].value is not None else ""
+            except:
+                b8_text = ""
     except Exception as e:
         st.error(f"Error leyendo consumos: {e}")
         st.stop()
@@ -79,8 +91,14 @@ if reporte_file and proveedores_file and plantilla_file:
     df_prov["ProvClean"]   = df_prov["Proveedores"].str.replace(r"\s*\(.*\)", "", regex=True).str.strip()
     df_prov["MarcaClean"]  = df_prov["marcas"].astype(str).str.strip()
 
-    # 3) Buscar proveedor por marca en B7
-    matches = df_prov[df_prov["MarcaClean"].str.lower() == marca.lower()]
+    # 3) Buscar proveedor (regla especial KANSAS con B8)
+    if str(marca).strip().upper() == "KANSAS":
+        ref_texto = "KANSAS - [MARTIN FIERRO 3361] - UDAONDO - BUENOS AIRES - 10010846"
+        target_cuit = "30-71667294-4" if b8_text == ref_texto else "30-69765269-4"
+        matches = df_prov[df_prov["CUIT"].astype(str).str.strip() == target_cuit]
+    else:
+        matches = df_prov[df_prov["MarcaClean"].str.lower() == marca.lower()]
+
     if matches.empty:
         st.error(f"No se encontró proveedor para la marca: '{marca}'")
         st.stop()
@@ -110,7 +128,7 @@ if reporte_file and proveedores_file and plantilla_file:
             decs    = int(round((total - entero) * 100))
             literal = num2words(entero, lang="es").capitalize() + f" con {decs:02d}"
 
-            # Mapeo con los nombres reales de tu PDF
+            # Mapeo con formato AR en los montos
             valores = {
                 "cliente":     prov["ProvClean"],    # Señor/es
                 "dirección":   prov["Dirección"],   # Dirección
@@ -119,9 +137,9 @@ if reporte_file and proveedores_file and plantilla_file:
                 "fecha":       lp_str,              # Fecha
                 "nfactura":    numero_lp,           # Nº LP
                 "detalle":     "ventas por cuenta y orden",
-                "subtotal":    f"{subtotal}",
-                "iva insc":    f"{iva_amt}",
-                "iva total":   f"{total}",
+                "subtotal":    fmt_money(subtotal),
+                "iva insc":    fmt_money(iva_amt),
+                "iva total":   fmt_money(total),
                 "liquidacion": periodo_liq,
                 "enpesos":     literal,             # Son Pesos
             }
