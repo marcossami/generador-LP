@@ -121,12 +121,18 @@ if reporte_file and proveedores_file and plantilla_file:
                 campos = [f.T[1:-1] for f in tpl.Root.AcroForm.Fields if f.T]
                 st.write("📑 Campos internos detectados:", campos)
 
-            # Calcular IVA y Total en letras
+            # Calcular IVA y Total y armar literal (enteros y decimales en letras)
             iva_amt = round(subtotal * iva_rate / 100, 2)
             total   = round(subtotal + iva_amt, 2)
             entero  = int(total)
             decs    = int(round((total - entero) * 100))
-            literal = num2words(entero, lang="es").capitalize() + f" con {decs:02d}"
+
+            entero_letras = num2words(entero, lang="es").capitalize()
+            if decs > 0:
+                decs_letras = num2words(decs, lang="es")
+                literal = f"{entero_letras} con {decs_letras}"
+            else:
+                literal = entero_letras
 
             # Mapeo con formato AR en los montos
             valores = {
