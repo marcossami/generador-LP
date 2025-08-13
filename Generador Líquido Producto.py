@@ -10,11 +10,11 @@ from pdfrw import PdfReader, PdfWriter, PdfDict, PdfObject
 
 st.set_page_config(page_title="Generador de Nota de Venta y LP", layout="wide")
 
-# Logo CTC arriba a la izquierda
+# Logo CTC más grande arriba a la izquierda
 st.markdown(
     """
     <div style='display: flex; align-items: center;'>
-        <img src='https://raw.githubusercontent.com/marcossami/generador-LP/main/logo-ctcgroup.png' width='150' style='margin-right: 15px;'>
+        <img src='https://raw.githubusercontent.com/marcossami/generador-LP/main/logo-ctcgroup.png' width='220' style='margin-right: 15px;'>
     </div>
     """,
     unsafe_allow_html=True
@@ -42,10 +42,10 @@ def cargar_consumos(raw_bytes, filename):
 def fmt_money(v):
     return f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# ─── Sidebar Inputs ────────────────────────────────────────────────────────────
-reporte_file     = st.sidebar.file_uploader("Reporte consumos (.xls/.xlsx/.csv)",   type=["xls","xlsx","csv"])
-proveedores_file = st.sidebar.file_uploader("Listado proveedores (.xls/.xlsx/.csv)", type=["xls","xlsx","csv"])
-plantilla_file   = st.sidebar.file_uploader("Plantilla editable LP (PDF)",          type=["pdf"])
+# ─── Sidebar Inputs (solo cambian etiquetas) ───────────────────────────────────
+reporte_file     = st.sidebar.file_uploader("Reporte De Consumos",     type=["xls","xlsx","csv"])
+proveedores_file = st.sidebar.file_uploader("Listado De Proveedores",  type=["xls","xlsx","csv"])
+plantilla_file   = st.sidebar.file_uploader("Plantilla Editable",      type=["pdf"])
 numero_lp        = st.sidebar.text_input("Número de LP")
 
 # IVA fijo al 21%
@@ -63,7 +63,7 @@ periodo_liq = f"{prev_m:02d}/{prev_y}"
 
 # ─── Workflow ─────────────────────────────────────────────────────────────────
 if reporte_file and proveedores_file and plantilla_file:
-    # 1) Leer consumos y extraer Subtotal (celda I11), marca (B7) y B8 para KANSAS
+    # 1) Leer consumos y extraer Subtotal (I11), marca (B7) y B8 (KANSAS)
     raw_cons = reporte_file.read()
     try:
         df_cons   = cargar_consumos(raw_cons, reporte_file.name)
@@ -174,9 +174,7 @@ if reporte_file and proveedores_file and plantilla_file:
 
             # Forzar regenerar apariencias
             if tpl.Root.AcroForm:
-                tpl.Root.AcroForm.update(
-                    PdfDict(NeedAppearances=PdfObject("true"))
-                )
+                tpl.Root.AcroForm.update(PdfDict(NeedAppearances=PdfObject("true")))
 
             # Guardar y descargar
             out = BytesIO()
