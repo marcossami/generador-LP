@@ -190,4 +190,5 @@ if reporte_file and proveedores_file and plantilla_file:
         except Exception as e:
             st.error(f"Error generando LP: {e}")
 else:
-    st.info("Carga reporte consumos, proveedores y plantilla PDF para habilitar la generación.")
+    st.info(" Por favor, cargar reporte de consumos, listado de proveedores y plantilla PDF para comenzar.")
+
