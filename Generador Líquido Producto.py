@@ -9,6 +9,17 @@ from openpyxl import load_workbook
 from pdfrw import PdfReader, PdfWriter, PdfDict, PdfObject
 
 st.set_page_config(page_title="Generador de Nota de Venta y LP", layout="wide")
+
+# Logo CTC arriba a la izquierda
+st.markdown(
+    """
+    <div style='display: flex; align-items: center;'>
+        <img src='https://raw.githubusercontent.com/marcossami/generador-LP/main/logo-ctcgroup.png' width='150' style='margin-right: 15px;'>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("Generador Automático de Nota de Venta y Líquido Producto")
 
 def cargar_consumos(raw_bytes, filename):
